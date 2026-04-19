@@ -2,8 +2,8 @@
 title: "Decision Tree Challenge"
 subtitle: "Feature Importance and Categorical Variable Encoding"
 format:
-  html: default
-  pdf: default
+  html:
+    embed-resources: true
 execute:
   echo: true
   eval: true
@@ -116,8 +116,6 @@ plt.title("Decision Tree (zipCode as Numerical)")
 plt.tight_layout()
 plt.show()
 ```
-
-:::
 
 ## Feature Importance Analysis
 
@@ -340,13 +338,58 @@ plt.show()
 
 ## Discussion Questions for Challenge
 
-**Your Task:** Add thoughtful narrative answers to these two questions in the Discussion Questions section of your rendered HTML site.
+**Your Task:** Add thoughtful narrative answers to these questions in the Discussion Questions section of the rendered HTML site.
 
-1. **Numerical vs Categorical Encoding:** There are two modelsin Python written above. For each language, the models differ by how zip code is modelled, either as a numerical variable or as a categorical variable. Given what you know about zip codes and real estate prices, how should zip code be modelled, numerically or categorically?  Is zipcode and ordinal or non-ordinal variable?
+1. **Numerical vs Categorical Encoding:** There are two models in Python written above. For each language, the models differ by how zip code is modelled, either as a numerical variable or as a categorical variable. Given what you know about zip codes and real estate prices, how should zip code be modelled, numerically or categorically? Is zip code an ordinal or non-ordinal variable?
 
-2. **R vs Python Implementation Differences:** When modelling zip code as a categorical variable, the output tree and feature importance would differ quite significantly had you used R as opposed to Python. Investigate why this is the case.  What does R offer that Python does not? Which language would you say does a better job of modelling zip code as a categorical variable? Can you quote the documentation at [https://scikit-learn.org/stable/modules/tree.html](https://scikit-learn.org/stable/modules/tree.html) suggesting a weakness in the Python implementation? If so, please provide a quote from the documentation.
+   **Answer.** The analysis above fits **two Python decision trees**: the first keeps **`zipCode` as one numeric column**; the second **one-hot encodes** each zip into binary columns (e.g. `zipCode_50010`, …). Scikit-learn’s tree expects **numeric features** and searches for **threshold splits** (e.g. `zipCode` ≤ 50012.5). Zip codes in real estate represent **neighborhoods**, not a smooth quantity: **50013** is not “more house” than **50012** the way square footage is. So zip code is **non-ordinal (nominal)**—levels differ, but **order is meaningless** for price. **Zip code should be modelled categorically** (here via one-hot). Using a single numeric code can produce **misleading splits and importance** (as in the first bar chart), understating how much **location** matters compared to a proper categorical treatment.
 
-3. **Are There Any Suggestions for Implementing Decision Trees in Python With Prioper Categorical Handling?** Please poke around the Internet (AI is not as helpful with new libraries) for suggestions on how to implement decision trees in Python with better (i.e. not one-hot encoding) categorical handling.  Please provide a link to the source and a quote from the source.  There is not right answer here, but please provide a thoughtful answer, I am curious to see what you find.
+2. **R vs Python Implementation Differences:** When modelling zip code as a categorical variable, the output tree and feature importance would differ quite significantly had you used R as opposed to Python. Investigate why this is the case. What does R offer that Python does not? Which language would you say does a better job of modelling zip code as a categorical variable? Can you quote the documentation at [https://scikit-learn.org/stable/modules/tree.html](https://scikit-learn.org/stable/modules/tree.html) suggesting a weakness in the Python implementation? If so, please provide a quote from the documentation.
+
+   **Answer.** **R’s `rpart`** works naturally with **factors**, so unordered categories are part of the data model; the tree search can respect **categorical structure** rather than treating codes as a continuous axis. **`sklearn.tree.DecisionTreeRegressor`** uses **CART** on a **numeric matrix**; you must **encode** categories yourself (e.g. one-hot), which **splits importance across many dummies** and changes the **tree shape** versus a single factor in R. Official documentation states:
+
+   > "Able to handle both numerical and categorical data. **However, the scikit-learn implementation does not support categorical variables for now.**"
+
+   — [Decision Trees — scikit-learn](https://scikit-learn.org/stable/modules/tree.html)
+
+   > "scikit-learn uses an optimized version of the CART algorithm; **however, the scikit-learn implementation does not support categorical variables for now.**"
+
+   — [same page](https://scikit-learn.org/stable/modules/tree.html)
+
+   The [`DecisionTreeRegressor` API](https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeRegressor.html) describes training inputs as converted **internally to `dtype=np.float32`**, i.e. **numeric** features. For **direct** categorical handling without manual dummies, **R + `rpart`** is often more natural; **Python** is strong once you encode, and other libraries (below) add native categorical support.
+
+3. **Are There Any Suggestions for Implementing Decision Trees in Python With Prioper Categorical Handling?** Please poke around the Internet (AI is not as helpful with new libraries) for suggestions on how to implement decision trees in Python with better (i.e. not one-hot encoding) categorical handling. Please provide a link to the source and a quote from the source. There is not right answer here, but please provide a thoughtful answer, I am curious to see what you find.
+
+   **Answer.** 
+  One-hot encoding is a poor fit for decision trees with high-cardinality features like zip codes. As Damien Martin notes:
+
+    > "Tree-based models, such as Decision Trees, Random Forests, and Boosted Trees, typically don't perform well with one-hot encodings with lots of levels."
+
+    — [Are You Getting Burned By One-Hot Encoding?](https://kiwidamien.github.io/are-you-getting-burned-by-one-hot-encoding.html)
+
+    The `category_encoders` library offers two better alternatives, both fully sklearn-compatible:
+
+    **Target Encoding**
+
+    Replaces each zip code with its mean target value, blended toward the global mean for rare categories. Per the scikit-learn docs:
+
+    > "Each category is encoded based on a shrunk estimate of the average target values for observations belonging to the category."
+
+    — [sklearn TargetEncoder](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.TargetEncoder.html)
+
+    **Drawback:** Must be fit inside a `Pipeline` to prevent data leakage — if applied to the full dataset before splitting, target information bleeds into validation folds and inflates performance estimates.
+
+    **Binary Encoding**
+
+    Converts each zip to an integer then represents it in binary bits — "similar to onehot, but categories are stored as binary bitstrings." 40,000 zip codes become just ~16 columns instead of 40,000, with no leakage risk and `inverse_transform` for reverse mapping.
+
+    — [category_encoders BinaryEncoder](https://contrib.scikit-learn.org/category_encoders/binary.html)
+
+    **Drawback:** The integer assigned to each zip before binarisation is arbitrary, so the resulting bit columns don't group geographically or behaviourally similar zips together — the tree has to work harder to find meaningful patterns.
+
+    ---
+
+    Both are installed via: **pip install category_encoders**
 
 ## Grading Rubric 🎓
 
